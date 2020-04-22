@@ -310,9 +310,11 @@ my @netscreen_fan_operating_status 	= (2,0,4);
 # Cisco CISCO-ENTITY-SENSOR-MIB
 my $cisco_ios_xe_physicaldescr	    	= "1.3.6.1.2.1.47.1.1.1.1.7";
 my $cisco_ios_xe_type     	    	= "1.3.6.1.4.1.9.9.91.1.1.1.1.1"; 
-my @cisco_ios_xe_type_text	    	= ("not_specified","other","unknown","voltsAC","voltsDC","amperes","watts","hertz","celsius","percent","rpm","cmm","truthvalue","specialEnum","dBm");
-my $cisco_ios_xe_scale     	    	= "1.3.6.1.4.1.9.9.91.1.1.1.1.2"; 
-my @cisco_ios_xe_scale_power        	= ("0","-24","-21","-18","-15","12","e-9","e-6","e-3","e0","e3","e6","9","12","15","18","21","24"); 
+my @cisco_ios_xe_type_text		= ( "","other","unknown","voltsAC","voltsDC","amperes","watts","hertz","celsius","percentRH","rpm","cmm","truthvalue","specialEnum","dBm","dB");
+my @cisco_ios_xe_type_symbol		= ( "","other","unknown","V","V","A","W","Hz","C","%","rpm","cmm","truthvalue","specialEnum","dBm","dB");
+my $cisco_ios_xe_scale			= "1.3.6.1.4.1.9.9.91.1.1.1.1.2"; 
+my @cisco_ios_xe_scale_power		= ("0","-24","-21","-18","-15","12","e-9","e-6","e-3","e0","e3","e6","9","12","15","18","21","24"); 
+my @cisco_ios_xe_scale_symbol		= ( "","y","z","a","f","p","n","u","m","","k","M","G","T","P","E","Z","Y");
 my $cisco_ios_xe_precision	  	= "1.3.6.1.4.1.9.9.91.1.1.1.1.3"; 
 my $cisco_ios_xe_value     	    	= "1.3.6.1.4.1.9.9.91.1.1.1.1.4"; 
 my $cisco_ios_xe_status     	 	= "1.3.6.1.4.1.9.9.91.1.1.1.1.5"; 
@@ -321,6 +323,7 @@ my @cisco_ios_xe_operating_status   	= (0,1,2,3);
 my $cisco_ios_xe_threshold_severity	= "1.3.6.1.4.1.9.9.91.1.2.1.1.2";
 my $cisco_ios_xe_threshold_relation	= "1.3.6.1.4.1.9.9.91.1.2.1.1.3";
 my $cisco_ios_xe_threshold_value    	= "1.3.6.1.4.1.9.9.91.1.2.1.1.4";
+
 
 # Citrix NetScaler
 my $citrix_desc     			= "1.3.6.1.4.1.5951.4.1.1.41.7.1.1"; 
@@ -357,6 +360,7 @@ my $o_verb		= undef;	# Verbose mode
 my $o_version		= undef;	# Print version
 my $o_timeout		= undef; 	# Timeout (Default 5)
 my $o_perf		= undef;	# Output performance data
+my $o_regex		= undef;	# Regex filter for output performance data
 my $o_version1		= undef;	# Use SNMPv1
 my $o_version2		= undef;	# Use SNMPv2c
 my $o_domain		= undef;	# Use IPv6
@@ -469,6 +473,8 @@ Options:
    Maximum temp in degree celcius (only needed for 'iron' & 'linux')
 -f, --perfparse
    Perfparse compatible output
+-R, --regex-filter
+   Regex filter for performance output
 -t, --timeout=INTEGER
    Timeout for SNMP in seconds (Default: 5)
 -V, --version
@@ -506,6 +512,7 @@ sub check_options {
 		'1'     => \$o_version1,        'v1'            => \$o_version1,
 		'2'     => \$o_version2,        'v2c'           => \$o_version2,
 	        'f'     => \$o_perf,            'perfparse'     => \$o_perf,
+	        'R:s'   => \$o_regex,           'regex:s'       => \$o_regex,
 		'T:s'	=> \$o_check_type,	'type:s'	=> \$o_check_type,
 	        'F:i'   => \$o_fan,             'fan:i'     	=> \$o_fan,
 	        'c:i'   => \$o_temp,            'celcius:i'     => \$o_temp
@@ -865,8 +872,11 @@ if ($tempexist !=0) {
 # Clear the SNMP Transport Domain and any errors associated with the object.
 $session->close;
 
-#print $output," : ",$Nagios_state[$global_state]," | ",$perf_output,"\n";
-print $output," : ",$Nagios_state[$global_state],"\n";
+if (defined($o_perf)) {
+	print $Nagios_state[$global_state],": ",$output," |",$perf_output,"\n";
+} else {
+	print $Nagios_state[$global_state],": ",$output,"\n";
+}
 $exit_val=$ERRORS{$Nagios_state[$global_state]};
 
 exit $exit_val;
@@ -2205,27 +2215,31 @@ if ($o_check_type eq "ciscoNEW") {
 	# Define variables
 	my $output 		= "";
 	my $final_status 	= 0;
-	my $sensor_output	= "";						
 	my $tmp_status;
 	my $result_t;
 	my $index;
 	my @temp_oid;
 	my ($num_sensors,$num_sensors_ok,$num_sensors_threshold,$num_thresholds,$num_thresholds_ok) = (0,0,0,0,0);
+	my $output_perf		= "";
 
         # Get SNMP table(s) and check the result
-	my $resultat_status 		=  $session->get_table(Baseoid => $cisco_ios_xe_status);
+	my $resultat_status 		= $session->get_table(Baseoid => $cisco_ios_xe_status);
 	&check_snmp_result($resultat_status,$session->error);
-	my $resultat_type 		=  $session->get_table(Baseoid => $cisco_ios_xe_type);
+	my $resultat_physicaldescr	= $session->get_table(Baseoid => $cisco_ios_xe_physicaldescr);
+	&check_snmp_result($resultat_physicaldescr,$session->error);
+	my $resultat_type 		= $session->get_table(Baseoid => $cisco_ios_xe_type);
 	&check_snmp_result($resultat_type,$session->error);
-	my $resultat_precision 		=  $session->get_table(Baseoid => $cisco_ios_xe_precision);
+	my $resultat_scale 		= $session->get_table(Baseoid => $cisco_ios_xe_scale);
+	&check_snmp_result($resultat_scale,$session->error);
+	my $resultat_precision 		= $session->get_table(Baseoid => $cisco_ios_xe_precision);
 	&check_snmp_result($resultat_precision,$session->error);
-	my $resultat_value 		=  $session->get_table(Baseoid => $cisco_ios_xe_value);
+	my $resultat_value 		= $session->get_table(Baseoid => $cisco_ios_xe_value);
 	&check_snmp_result($resultat_value,$session->error);
-	my $resultat_threshold_severity	=  $session->get_table(Baseoid => $cisco_ios_xe_threshold_severity);
+	my $resultat_threshold_severity	= $session->get_table(Baseoid => $cisco_ios_xe_threshold_severity);
 	&check_snmp_result($resultat_threshold_severity,$session->error);
-	my $resultat_threshold_relation	=  $session->get_table(Baseoid => $cisco_ios_xe_threshold_relation);
+	my $resultat_threshold_relation	= $session->get_table(Baseoid => $cisco_ios_xe_threshold_relation);
 	&check_snmp_result($resultat_threshold_relation,$session->error);
-	my $resultat_threshold_value 	=  $session->get_table(Baseoid => $cisco_ios_xe_threshold_value);
+	my $resultat_threshold_value 	= $session->get_table(Baseoid => $cisco_ios_xe_threshold_value);
 	&check_snmp_result($resultat_threshold_value,$session->error);
 
 	if (defined($resultat_status)) {	
@@ -2238,84 +2252,91 @@ if ($o_check_type eq "ciscoNEW") {
 				$index = $key;
 				$index =~ s/^$cisco_ios_xe_status.//;
 
+				# Get sensor DESCRIPTION
+				my $CiscoDescription = $$resultat_physicaldescr{$cisco_ios_xe_physicaldescr.".".$index};
+
 				if ($tmp_status == 1) {
 					$num_sensors_ok++;
 
 					# Get sensor TYPE
 					my $CiscoType = $$resultat_type{$cisco_ios_xe_type.".".$index};
 									
-					# 8 = celcius, 10 = rpm
-					if ($CiscoType == 8 || $CiscoType == 10) {
+					# Get sensor VALUE
+					my $CiscoValue = $$resultat_value{$cisco_ios_xe_value.".".$index};
 
-						# Get sensor PRECISION
-						my $CiscoPrecision = $$resultat_precision{$cisco_ios_xe_precision.".".$index};	
+					# Fill performance output string
+					if (defined($o_perf)) {
+						my $CiscoScale = $$resultat_scale{$cisco_ios_xe_scale.".".$index};
 
-						if ($CiscoPrecision == 0){
-
-							# Get sensor THRESHOLDS
-							for (my $i = 1; my $CiscoThreshold_value = $$resultat_threshold_value{$cisco_ios_xe_threshold_value.".".$index.".".$i} ; $i++) {
-								# Get sensor VALUE
-								my $CiscoValue = $$resultat_value{$cisco_ios_xe_value.".".$index};	
-
-								# Get sensor THRESHOLD SEVERITY
-								my $CiscoThreshold_severity = $$resultat_threshold_severity{$cisco_ios_xe_threshold_severity.".".$index.".".$i};
-
-								# Get sensor THRESHOLD RELATION
-								my $CiscoThreshold_relation = $$resultat_threshold_relation{$cisco_ios_xe_threshold_relation.".".$index.".".$i};
-
-								if ($CiscoThreshold_severity && ($CiscoThreshold_severity ne "noSuchInstance") &&
-								    $CiscoThreshold_relation && ($CiscoThreshold_relation ne "noSuchInstance") ) {
-									$num_thresholds++;
-									if ($i==1) { $num_sensors_threshold++; }
-									
-									if    ($CiscoThreshold_relation == 1) {
-										if ($CiscoThreshold_value <  $CiscoValue) { $num_thresholds_ok++; }
-									}
-									elsif ($CiscoThreshold_relation == 2) {
-										if ($CiscoThreshold_value <= $CiscoValue) { $num_thresholds_ok++; }
-									}
-									elsif ($CiscoThreshold_relation == 3) {
-										if ($CiscoThreshold_value >  $CiscoValue) { $num_thresholds_ok++; }
-									}
-									elsif ($CiscoThreshold_relation == 4) {
-										if ($CiscoThreshold_value >= $CiscoValue) { $num_thresholds_ok++; }
-									}
-									elsif ($CiscoThreshold_relation == 5) {
-										if ($CiscoThreshold_value == $CiscoValue) { $num_thresholds_ok++; }
-									}
-									elsif ($CiscoThreshold_relation == 6) {
-										if ($CiscoThreshold_value != $CiscoValue) { $num_thresholds_ok++; }
-									}
-									else	{
-										$final_status=2;
-
-										# Get sensor DESCRIPTION
-										@temp_oid=($cisco_ios_xe_physicaldescr.".".$index);
-										$result_t = $session->get_request( Varbindlist => \@temp_oid);	
-
-										if ($output ne "") {$output.=", ";}
-										$output.= "(" .$$result_t{$cisco_ios_xe_physicaldescr.".".$index}.": ".$CiscoValue.")";
-									}
-								}
+						if (defined($o_regex)) {
+							if ($CiscoDescription =~ /$o_regex/) {
+								if ($output_perf ne "") { $output_perf .=" ";}
+								$output_perf .= "'".$CiscoDescription."'=".$CiscoValue;
+								$output_perf .= $cisco_ios_xe_scale_symbol[$CiscoScale];
+								$output_perf .= $cisco_ios_xe_type_symbol[$CiscoType];
 							}
-
+						} else {
+							if ($output_perf ne "") { $output_perf .=" ";}
+							$output_perf .= "'".$CiscoDescription."'=".$CiscoValue;
+							$output_perf .= $cisco_ios_xe_scale_symbol[$CiscoScale];
+							$output_perf .= $cisco_ios_xe_type_symbol[$CiscoType];
 						}
 					}
-	
-				} else {
-					$final_status=2;
 
-					# Get sensor DESCRIPTION
-					@temp_oid=($cisco_ios_xe_physicaldescr.".".$index);
-					$result_t = $session->get_request( Varbindlist => \@temp_oid);	
+					# Get sensor PRECISION
+					my $CiscoPrecision = $$resultat_precision{$cisco_ios_xe_precision.".".$index};	
+
+					if ($CiscoPrecision == 0){
+						# Get sensor THRESHOLDS
+						for (my $i = 1; my $CiscoThreshold_value = $$resultat_threshold_value{$cisco_ios_xe_threshold_value.".".$index.".".$i} ; $i++) {
+							# Get sensor THRESHOLD SEVERITY
+							my $CiscoThreshold_severity = $$resultat_threshold_severity{$cisco_ios_xe_threshold_severity.".".$index.".".$i};
+
+							# Get sensor THRESHOLD RELATION
+							my $CiscoThreshold_relation = $$resultat_threshold_relation{$cisco_ios_xe_threshold_relation.".".$index.".".$i};
+
+							if ($CiscoThreshold_severity && ($CiscoThreshold_severity ne "noSuchInstance") &&
+							    $CiscoThreshold_relation && ($CiscoThreshold_relation ne "noSuchInstance") ) {
+								$num_thresholds++;
+								if ($i==1) { $num_sensors_threshold++; }
+								
+								if    ($CiscoThreshold_relation == 1) {
+									if ($CiscoThreshold_value <  $CiscoValue) { $num_thresholds_ok++; }
+								}
+								elsif ($CiscoThreshold_relation == 2) {
+									if ($CiscoThreshold_value <= $CiscoValue) { $num_thresholds_ok++; }
+								}
+								elsif ($CiscoThreshold_relation == 3) {
+									if ($CiscoThreshold_value >  $CiscoValue) { $num_thresholds_ok++; }
+								}
+								elsif ($CiscoThreshold_relation == 4) {
+									if ($CiscoThreshold_value >= $CiscoValue) { $num_thresholds_ok++; }
+								}
+								elsif ($CiscoThreshold_relation == 5) {
+									if ($CiscoThreshold_value == $CiscoValue) { $num_thresholds_ok++; }
+								}
+								elsif ($CiscoThreshold_relation == 6) {
+									if ($CiscoThreshold_value != $CiscoValue) { $num_thresholds_ok++; }
+								}
+								else	{
+									$final_status=1;
+
+									if ($output ne "") {$output.=", ";}
+									$output.= "(" .$CiscoDescription.": ".$CiscoValue.")";
+								}
+							}
+						}
+					}
+				} else {
+					$final_status=3;
 
 					if ($tmp_status	== 2){
 						if ($output ne "") {$output.=", ";}
-						$output.= "(" .$$result_t{$cisco_ios_xe_physicaldescr.".".$index}.": sensor unavailable)";
+						$output.= "(" .$CiscoDescription.": sensor unavailable)";
 					}
 					if ($tmp_status	== 3){
 						if ($output ne "") {$output.=", ";}
-						$output.= "(" .$$result_t{$cisco_ios_xe_physicaldescr.".".$index}.": sensor nonoperational)";
+						$output.= "(" .$CiscoDescription.": sensor nonoperational)";
 					}	
 				}
 			}
@@ -2332,31 +2353,33 @@ if ($o_check_type eq "ciscoNEW") {
 
 	if ($output ne "") {$output.=" : ";}
 	if ($num_sensors!=0) {
-		#printf "$num_thresholds\t$num_thresholds_ok\n";
-
 		if (($num_sensors == $num_sensors_ok) && ($num_thresholds == $num_thresholds_ok)){
 		  $output.= $num_sensors . " sensors OK (".$num_thresholds." thresholds OK)";
 		} else {
 		  $output.= $num_sensors_ok . "/" . $num_sensors ." sensors OK (".$num_sensors_threshold." sensors using thresholds)";
 		}
 	}
+	
+	if ($output_perf ne "") {
+		$output .= " | ".$output_perf;
+	}
 
 	if ($final_status == 3) {
-		print $output," : UNKNOWN\n";
+		print "UNKNOWN: ",$output,"\n";
 		exit $ERRORS{"UNKNOWN"};
 	} 
 	
 	if ($final_status == 2) {
-		print $output," : CRITICAL\n";
+		print "CRITICAL: ",$output,"\n";
 		exit $ERRORS{"CRITICAL"};
 	}
 
 	if ($final_status == 1) {
-		print $output," : WARNING\n";
+		print "WARNING: ",$output,"\n";
 		exit $ERRORS{"WARNING"};
 	}
 
-	print $output," : OK\n";
+	print "OK: ",$output,"\n";
 	exit $ERRORS{"OK"};
 }
 
