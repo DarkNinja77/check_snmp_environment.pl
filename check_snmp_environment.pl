@@ -2245,6 +2245,8 @@ if ($o_check_type eq "ciscoNEW") {
 	if (defined($resultat_status)) {	
 		foreach my $key ( keys %$resultat_status) {
 			if ($key =~ /$cisco_ios_xe_status/) {
+				my $warn;
+				my $crit;
 				$num_sensors++;
 
 				$tmp_status=$cisco_ios_xe_operating_status[$$resultat_status{$key}];
@@ -2263,25 +2265,6 @@ if ($o_check_type eq "ciscoNEW") {
 									
 					# Get sensor VALUE
 					my $CiscoValue = $$resultat_value{$cisco_ios_xe_value.".".$index};
-
-					# Fill performance output string
-					if (defined($o_perf)) {
-						my $CiscoScale = $$resultat_scale{$cisco_ios_xe_scale.".".$index};
-
-						if (defined($o_regex)) {
-							if ($CiscoDescription =~ /$o_regex/) {
-								if ($output_perf ne "") { $output_perf .=" ";}
-								$output_perf .= "'".$CiscoDescription."'=".$CiscoValue;
-								$output_perf .= $cisco_ios_xe_scale_symbol[$CiscoScale];
-								$output_perf .= $cisco_ios_xe_type_symbol[$CiscoType];
-							}
-						} else {
-							if ($output_perf ne "") { $output_perf .=" ";}
-							$output_perf .= "'".$CiscoDescription."'=".$CiscoValue;
-							$output_perf .= $cisco_ios_xe_scale_symbol[$CiscoScale];
-							$output_perf .= $cisco_ios_xe_type_symbol[$CiscoType];
-						}
-					}
 
 					# Get sensor PRECISION
 					my $CiscoPrecision = $$resultat_precision{$cisco_ios_xe_precision.".".$index};	
@@ -2302,15 +2285,23 @@ if ($o_check_type eq "ciscoNEW") {
 								
 								if    ($CiscoThreshold_relation == 1) {
 									if ($CiscoThreshold_value <  $CiscoValue) { $num_thresholds_ok++; }
+									if ($CiscoThreshold_severity == 30) { $crit = $CiscoThreshold_value; }
+									else 				    { $warn = $CiscoThreshold_value; }
 								}
 								elsif ($CiscoThreshold_relation == 2) {
 									if ($CiscoThreshold_value <= $CiscoValue) { $num_thresholds_ok++; }
+									if ($CiscoThreshold_severity == 30) { $crit = $CiscoThreshold_value; }
+									else 				    { $warn = $CiscoThreshold_value; }
 								}
 								elsif ($CiscoThreshold_relation == 3) {
 									if ($CiscoThreshold_value >  $CiscoValue) { $num_thresholds_ok++; }
+									if ($CiscoThreshold_severity == 30) { $crit = $CiscoThreshold_value; }
+									else 				    { $warn = $CiscoThreshold_value; }
 								}
 								elsif ($CiscoThreshold_relation == 4) {
 									if ($CiscoThreshold_value >= $CiscoValue) { $num_thresholds_ok++; }
+									if ($CiscoThreshold_severity == 30) { $crit = $CiscoThreshold_value; }
+									else 				    { $warn = $CiscoThreshold_value; }
 								}
 								elsif ($CiscoThreshold_relation == 5) {
 									if ($CiscoThreshold_value == $CiscoValue) { $num_thresholds_ok++; }
@@ -2325,9 +2316,28 @@ if ($o_check_type eq "ciscoNEW") {
 									$output.= "(" .$CiscoDescription.": ".$CiscoValue.")";
 								}
 							}
+						} # for
+					} # if ($CiscoPrecision == 0)
+
+					# Fill performance output string
+					if (defined($o_perf)) {
+						my $CiscoScale = $$resultat_scale{$cisco_ios_xe_scale.".".$index};
+
+						if ( defined($o_regex) && $CiscoDescription =~ /$o_regex/  ||  ! defined($o_regex) ) {
+							if ($output_perf ne "") { $output_perf .=" ";}
+							$output_perf .= "'".$CiscoDescription."'=".$CiscoValue;
+							$output_perf .= $cisco_ios_xe_scale_symbol[$CiscoScale];
+							$output_perf .= $cisco_ios_xe_type_symbol[$CiscoType];
+
+							if (defined($warn)) {
+								$output_perf .= ";".$warn;
+								if (defined($crit)) { $output_perf .= ";".$crit; }
+							} elsif (defined($crit)) {
+								$output_perf .= ";;".$crit;
+							}
 						}
 					}
-				} else {
+				} else { # if ($tmp_status == 0)
 					$final_status=3;
 
 					if ($tmp_status	== 2){
@@ -2359,6 +2369,7 @@ if ($o_check_type eq "ciscoNEW") {
 		  $output.= $num_sensors_ok . "/" . $num_sensors ." sensors OK (".$num_sensors_threshold." sensors using thresholds)";
 		}
 	}
+
 	
 	if ($output_perf ne "") {
 		$output .= " | ".$output_perf;
