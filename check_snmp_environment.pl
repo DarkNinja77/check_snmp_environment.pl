@@ -727,7 +727,7 @@ foreach my $key ( keys %$resultat) {
 }
 
 if ( ($voltexist ==0) && ($tempexist ==0) && ($fanexist ==0) && ($psexist ==0) ) {
-  print "No Environemental data found : UNKNOWN \n";
+  print "UNKNOWN: No environmental data found.\n";
   exit $ERRORS{"UNKNOWN"};
 }
 
@@ -2381,7 +2381,7 @@ if ($o_check_type eq "ciscoNEW") {
 	$session->close;
 
 	if ($num_sensors==0) {
-		print "No components found : UNKNOWN\n";
+		print "UNKNOWN: No sensor data found.\n";
 		exit $ERRORS{"UNKNOWN"};
 	}
 
