@@ -718,7 +718,10 @@ foreach my $key ( keys %$resultat) {
    }
    if ( $key =~ /$ciscoPSTableDesc/ ) { 
       @oid=split (/\./,$key);
-      $psindex[$psexist++] = pop(@oid);
+      my $i = pop(@oid);
+      if ($$resultat{$ciscoPSTableState . "." . $i} ne 5) {
+      	$psindex[$psexist++] = $i;
+      }
    }
 }
 
@@ -743,7 +746,7 @@ if ($voltexist !=0) {
     } 
     if (defined($$resultat{$ciscoVoltageTableValue."." . $voltindex[$i]})) {
       $perf_output.=" '".$$resultat{$ciscoVoltageTableDesc .".".$voltindex[$i]}."'=" ;
-      $perf_output.=$$resultat{$ciscoVoltageTableValue."." . $voltindex[$i]};
+      $perf_output.=$$resultat{$ciscoVoltageTableValue."." . $voltindex[$i]}."mV";
     }	
     if ($Nagios_state[$CiscoEnvMonNagios{$cur_status}] ne "OK") {
       $volt_global= 1;
@@ -765,7 +768,7 @@ if ($tempexist !=0) {
     }
     if (defined($$resultat{$ciscoTempTableValue."." . $tempindex[$i]})) {
       $perf_output.=" '".$$resultat{$ciscoTempTableDesc .".".$tempindex[$i]}."'=" ;
-      $perf_output.=$$resultat{$ciscoTempTableValue."." . $tempindex[$i]};
+      $perf_output.=$$resultat{$ciscoTempTableValue."." . $tempindex[$i]}."C";
     }
     if ($Nagios_state[$CiscoEnvMonNagios{$cur_status}] ne "OK") {
       $temp_global= 1;
@@ -798,7 +801,7 @@ if ($psexist !=0) {
   for ($i=0;$i < $psexist; $i++) {
     $cur_status=$$resultat{$ciscoPSTableState . "." . $psindex[$i]};
     if (!defined ($cur_status)) { ### Error TODO
-      $fan_global=1;
+      $ps_global=1;
     }
     if ($Nagios_state[$CiscoEnvMonNagios{$cur_status}] ne "OK") {
       $ps_global= 1;
