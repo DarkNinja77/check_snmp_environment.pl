@@ -119,8 +119,6 @@ use warnings;
 use strict;
 use Net::SNMP;
 use Getopt::Long;
-#use lib "/usr/local/nagios/libexec";
-#use utils qw(%ERRORS $TIMEOUT);
 
 
 # ============================================================================
@@ -147,12 +145,15 @@ my $ciscoVoltageTable 			= $ciscoEnvMonMIB.".1.2.1"; 		# Cisco voltage table
 my $ciscoVoltageTableIndex 		= $ciscoVoltageTable.".1"; 		#Index table
 my $ciscoVoltageTableDesc 		= $ciscoVoltageTable.".2"; 		#Description
 my $ciscoVoltageTableValue 		= $ciscoVoltageTable.".3"; 		#Value
+my $ciscoVoltageTableThresholdLow	= $ciscoVoltageTable.".4"; 		#Lower threshold
+my $ciscoVoltageTableThresholdHigh	= $ciscoVoltageTable.".5"; 		#Upper threshold
 my $ciscoVoltageTableState 		= $ciscoVoltageTable.".7"; 		#Status
 
 my $ciscoTempTable 			= $ciscoEnvMonMIB.".1.3.1"; 		# Cisco temprature table
 my $ciscoTempTableIndex 		= $ciscoTempTable.".1"; 		#Index table
 my $ciscoTempTableDesc 			= $ciscoTempTable.".2"; 		#Description
 my $ciscoTempTableValue 		= $ciscoTempTable.".3"; 		#Value
+my $ciscoTempTableThreshold 		= $ciscoTempTable.".4"; 		#Threshold (high)
 my $ciscoTempTableState 		= $ciscoTempTable.".6"; 		#Status
 
 my $ciscoFanTable 			= $ciscoEnvMonMIB.".1.4.1"; 		# Cisco fan table
@@ -692,9 +693,9 @@ my $exit_val=undef;
 
 if ($o_check_type eq "cisco") {
 
-verb("Checking cisco env");
+verb("Checking Cisco EnvMon MIB");
 
-# Get load table
+# Get EnvMon table
 my $resultat =  $session->get_table(Baseoid => $ciscoEnvMonMIB);
 &check_snmp_result($resultat,$session->error);
 
@@ -731,53 +732,72 @@ if ( ($voltexist ==0) && ($tempexist ==0) && ($fanexist ==0) && ($psexist ==0) )
 }
 
 my $perf_output="";
-# Get the data
-my ($i,$cur_status)=(undef,undef); 
+my ($i,$cur_desc,$cur_status,$cur_value)=(undef,undef,undef,undef); 
 
+# Cisco voltage table
 my $volt_global=0;
 my %volt_status;
 if ($voltexist !=0) {
   for ($i=0;$i < $voltexist; $i++) {
+    $cur_desc=$$resultat{$ciscoVoltageTableDesc .".".$voltindex[$i]};
     $cur_status=$$resultat{$ciscoVoltageTableState. "." . $voltindex[$i]};
-    verb ($$resultat{$ciscoVoltageTableDesc .".".$voltindex[$i]});
+    $cur_value=$$resultat{$ciscoVoltageTableValue."." . $voltindex[$i]};
+    verb ($cur_desc);
     verb ($cur_status);
     if (!defined ($cur_status)) { ### Error TODO
       $volt_global=1;
     } 
-    if (defined($$resultat{$ciscoVoltageTableValue."." . $voltindex[$i]})) {
-      $perf_output.=" '".$$resultat{$ciscoVoltageTableDesc .".".$voltindex[$i]}."'=" ;
-      $perf_output.=$$resultat{$ciscoVoltageTableValue."." . $voltindex[$i]}."mV";
-    }	
     if ($Nagios_state[$CiscoEnvMonNagios{$cur_status}] ne "OK") {
       $volt_global= 1;
-      $volt_status{$$resultat{$ciscoVoltageTableDesc .".".$voltindex[$i]}}=$cur_status;
+      $volt_status{$cur_desc}=$cur_status;
     }
+    if (defined($o_perf) && defined($cur_desc) && defined($cur_value) ) {
+      if ( defined($o_regex) && $cur_desc  =~ /$o_regex/ ||  ! defined($o_regex) ) {
+        $perf_output.=" '".$cur_desc."'=".$cur_value."mV";
+        my $warn=$$resultat{$ciscoVoltageTableThresholdLow."." . $voltindex[$i]};
+        my $crit=$$resultat{$ciscoVoltageTableThresholdHigh."." . $voltindex[$i]};
+	if (defined($warn)) {
+          $perf_output.=";".$warn;
+          if (defined($crit)) { $perf_output.=";".$crit; }
+        } elsif (defined($crit)) {
+          $perf_output.=";;".$crit;
+        }
+      }
+    }	
   }
 }
 
 
+# Cisco temperature table
 my $temp_global=0;
 my %temp_status;
 if ($tempexist !=0) {
   for ($i=0;$i < $tempexist; $i++) {
-    $cur_status=$$resultat{$ciscoTempTableState . "." . $tempindex[$i]};
-    verb ($$resultat{$ciscoTempTableDesc .".".$tempindex[$i]});
+    $cur_desc=$$resultat{$ciscoTempTableDesc .".".$tempindex[$i]};
+    $cur_status=$$resultat{$ciscoTempTableState. "." . $tempindex[$i]};
+    $cur_value=$$resultat{$ciscoTempTableValue."." . $tempindex[$i]};
+    verb ($cur_desc);
     verb ($cur_status);
     if (!defined ($cur_status)) { ### Error TODO
       $temp_global=1;
-    }
-    if (defined($$resultat{$ciscoTempTableValue."." . $tempindex[$i]})) {
-      $perf_output.=" '".$$resultat{$ciscoTempTableDesc .".".$tempindex[$i]}."'=" ;
-      $perf_output.=$$resultat{$ciscoTempTableValue."." . $tempindex[$i]}."C";
-    }
+    } 
     if ($Nagios_state[$CiscoEnvMonNagios{$cur_status}] ne "OK") {
       $temp_global= 1;
-      $temp_status{$$resultat{$ciscoTempTableDesc .".".$tempindex[$i]}}=$cur_status;
+      $temp_status{$cur_desc}=$cur_status;
+    }
+    if (defined($o_perf) && defined($cur_desc) && defined($cur_value) ) {
+      if ( defined($o_regex) && $cur_desc  =~ /$o_regex/ ||  ! defined($o_regex) ) {
+        $perf_output.=" '".$cur_desc."'=".$cur_value."C";
+        my $warn=$$resultat{$ciscoTempTableThreshold."." . $tempindex[$i]};
+	if (defined($warn)) {
+          $perf_output.=";".$warn;
+        }
+      }
     }
   }
 }
 
-                
+# Cisco fan table
 my $fan_global=0;
 my %fan_status;
 if ($fanexist !=0) {
@@ -795,6 +815,7 @@ if ($fanexist !=0) {
   }
 }
 
+# Cisco power supply table
 my $ps_global=0;
 my %ps_status;
 if ($psexist !=0) {
@@ -875,7 +896,7 @@ if ($tempexist !=0) {
 # Clear the SNMP Transport Domain and any errors associated with the object.
 $session->close;
 
-if (defined($o_perf)) {
+if ($perf_output ne "") {
 	print $Nagios_state[$global_state],": ",$output," |",$perf_output,"\n";
 } else {
 	print $Nagios_state[$global_state],": ",$output,"\n";
