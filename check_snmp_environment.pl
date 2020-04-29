@@ -788,9 +788,10 @@ if ($tempexist !=0) {
     if (defined($o_perf) && defined($cur_desc) && defined($cur_value) ) {
       if ( defined($o_regex) && $cur_desc  =~ /$o_regex/ ||  ! defined($o_regex) ) {
         $perf_output.=" '".$cur_desc."'=".$cur_value."C";
-        my $warn=$$resultat{$ciscoTempTableThreshold."." . $tempindex[$i]};
-	if (defined($warn)) {
-          $perf_output.=";".$warn;
+        my $crit=$$resultat{$ciscoTempTableThreshold."." . $tempindex[$i]};
+	if (defined($crit)) {
+          my $warn = $crit - 10;
+          $perf_output.=";".$warn.";".$crit;
         }
       }
     }
