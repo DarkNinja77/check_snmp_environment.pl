@@ -705,21 +705,22 @@ my ($voltexist,$tempexist,$fanexist,$psexist)=(0,0,0,0);
 my @oid=undef;
 foreach my $key ( keys %$resultat) {
    verb("OID : $key, Desc : $$resultat{$key}");
+   @oid=split (/\./,$key);
+   my $i = pop(@oid);
+
+
    if ( $key =~ /$ciscoVoltageTableDesc/ ) { 
-      @oid=split (/\./,$key);
-      $voltindex[$voltexist++] = pop(@oid);
+      $voltindex[$voltexist++] = $i;
    }
    if ( $key =~ /$ciscoTempTableDesc/ ) { 
-      @oid=split (/\./,$key);
-      $tempindex[$tempexist++] = pop(@oid);
+      if ($$resultat{$ciscoTempTableState . "." . $i} ne 5) {
+        $tempindex[$tempexist++] = $i;
+      }
    }
    if ( $key =~ /$ciscoFanTableDesc/ ) { 
-      @oid=split (/\./,$key);
-      $fanindex[$fanexist++] = pop(@oid);
+      $fanindex[$fanexist++] = $i;
    }
    if ( $key =~ /$ciscoPSTableDesc/ ) { 
-      @oid=split (/\./,$key);
-      my $i = pop(@oid);
       if ($$resultat{$ciscoPSTableState . "." . $i} ne 5) {
       	$psindex[$psexist++] = $i;
       }

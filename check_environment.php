@@ -43,23 +43,20 @@ foreach ($this->DS as $KEY=>$VAL) {
 	$lower    = "";
 	$upper    = "";
 	
-	if ($VAL['WARN'] != "" && is_numeric($VAL['WARN']) ){
-		$warning = $VAL['WARN'];
-	}
-	if ($VAL['WARN_MAX'] != "" && is_numeric($VAL['WARN_MAX']) ) {
-		$warn_max = $VAL['WARN_MAX'];
-	}
-	if ( $VAL['WARN_MIN'] != "" && is_numeric($VAL['WARN_MIN']) ) {
-		$warn_min = $VAL['WARN_MIN'];
-	}
-	if ( $VAL['CRIT'] != "" && is_numeric($VAL['CRIT']) ) {
-		$critical = $VAL['CRIT'];
-	}
-	if ( $VAL['CRIT_MAX'] != "" && is_numeric($VAL['CRIT_MAX']) ) {
-		$crit_max = $VAL['CRIT_MAX'];
-	}
-	if ( $VAL['CRIT_MIN'] != "" && is_numeric($VAL['CRIT_MIN']) ) {
-		$crit_min = $VAL['CRIT_MIN'];
+	if ($VAL['UNIT'] == "C" && preg_match("/^en-US,/", $_SERVER['HTTP_ACCEPT_LANGUAGE'] )) {
+		if ($VAL['WARN'] != "" && is_numeric($VAL['WARN']) ){
+			$warning = round ($VAL['WARN'] * 9 / 5 + 32);
+		}
+		if ( $VAL['CRIT'] != "" && is_numeric($VAL['CRIT']) ) {
+			$critical = round ($VAL['CRIT'] * 9 / 5 + 32);
+		}
+	} else {
+		if ($VAL['WARN'] != "" && is_numeric($VAL['WARN']) ){
+			$warning = $VAL['WARN'];
+		}
+		if ( $VAL['CRIT'] != "" && is_numeric($VAL['CRIT']) ) {
+			$critical = $VAL['CRIT'];
+		}
 	}
 	if ( $VAL['MIN'] != "" && is_numeric($VAL['MIN']) ) {
 		$lower = " --lower=" . $VAL['MIN'];
@@ -77,7 +74,11 @@ foreach ($this->DS as $KEY=>$VAL) {
 		$lower = " --lower=0 ";
 	}
 	elseif ($VAL['UNIT'] == "C") {
-		$vlabel = "°C";
+		if (preg_match("/^en-US,/", $_SERVER['HTTP_ACCEPT_LANGUAGE'] )) {
+			$vlabel = "°F";
+		} else {
+			$vlabel = "°C";
+		}
 		$title = "TEMPERATURE";
 	}
 	elseif ($VAL['UNIT'] == "mV") {
@@ -96,14 +97,14 @@ foreach ($this->DS as $KEY=>$VAL) {
 	// combine all data sources with the same unit of measure into one graph with index $GKEY
         $GKEY = $VAL['UNIT'];
 
-	// shorten variable labels
+	// shorten variable labels if needed
 	$var_label = $VAL['LABEL'];
 	if ($has_warn[$GKEY] && $has_crit[$GKEY]) {
-	  $var_label_cutoff = 20;
+	  $var_label_cutoff = 23;
         } elseif ($has_warn[$GKEY] || $has_crit[$GKEY]) {
-	  $var_label_cutoff = 30;
+	  $var_label_cutoff = 36;
         } else {
-	  $var_label_cutoff = 40;
+	  $var_label_cutoff = 49;
 	}
 	if (strlen($var_label) > $var_label_cutoff) {
           $var_label = str_replace(" Temp Sensor.", "", $var_label);
@@ -130,9 +131,13 @@ foreach ($this->DS as $KEY=>$VAL) {
 	if (!isset($ds_name[$GKEY])) { $ds_name[$GKEY] = $title; }
 
 	// crate the graph
-	$def[$GKEY] .= rrd::def     ("var$KEY", $VAL['RRDFILE'], $VAL['DS'], "AVERAGE");
-	//$def[$GKEY] .= rrd::area    ("var$KEY", "#d0d0d0" );
-	$def[$GKEY] .= rrd::line3   ("var$KEY", $_COLOR[$color_index[$GKEY]], $var_label );
+	if ( $vlabel == "°F" ) {
+	  $def[$GKEY] .= rrd::def ("celvar$KEY", $VAL['RRDFILE'], $VAL['DS'], "AVERAGE");
+          $def[$GKEY] .= rrd::cdef ("var$KEY", "9,5,/,celvar$KEY,*,32,+");
+        } else {
+	  $def[$GKEY] .= rrd::def ("var$KEY", $VAL['RRDFILE'], $VAL['DS'], "AVERAGE");
+        }
+	$def[$GKEY] .= rrd::line3 ("var$KEY", $_COLOR[$color_index[$GKEY]], $var_label );
 	$def[$GKEY] .= "GPRINT:var$KEY:LAST:\"%.0lf$vlabel now\" ";
 	$def[$GKEY] .= "GPRINT:var$KEY:MAX:\"%.0lf$vlabel max\" ";
 	$def[$GKEY] .= "GPRINT:var$KEY:AVERAGE:\"%.0lf$vlabel avg\" ";
