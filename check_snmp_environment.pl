@@ -2308,6 +2308,7 @@ if ($o_check_type eq "ciscoNEW") {
 								$num_thresholds++;
 								if ($i==1) { $num_sensors_threshold++; }
 								
+								# The order of the if-elsif-else statement matters, because $warn and $crit can be overwritten
 								if    ($CiscoThreshold_relation == 1) {
 									if ($CiscoThreshold_value <  $CiscoValue) { $num_thresholds_ok++; }
 									if ($CiscoThreshold_severity == 30) { $crit = $CiscoThreshold_value; }
@@ -2321,12 +2322,20 @@ if ($o_check_type eq "ciscoNEW") {
 								elsif ($CiscoThreshold_relation == 3) {
 									if ($CiscoThreshold_value >  $CiscoValue) { $num_thresholds_ok++; }
 									if ($CiscoThreshold_severity == 30) { $crit = $CiscoThreshold_value; }
-									else 				    { $warn = $CiscoThreshold_value; }
+									else {
+										# if voltage type, keep the "warn" level for lower volt threshold and use "crit" for upper volt threshold
+										if ($CiscoType == 3 || $CiscoType == 4) { $crit = $CiscoThreshold_value; }
+										else					{ $warn = $CiscoThreshold_value; }
+									}
 								}
 								elsif ($CiscoThreshold_relation == 4) {
 									if ($CiscoThreshold_value >= $CiscoValue) { $num_thresholds_ok++; }
 									if ($CiscoThreshold_severity == 30) { $crit = $CiscoThreshold_value; }
-									else 				    { $warn = $CiscoThreshold_value; }
+									else {
+										# if voltage type, keep the "warn" level for lower volt threshold and use "crit" for upper volt threshold
+										if ($CiscoType == 3 || $CiscoType == 4) { $crit = $CiscoThreshold_value; }
+										else					{ $warn = $CiscoThreshold_value; }
+									}
 								}
 								elsif ($CiscoThreshold_relation == 5) {
 									if ($CiscoThreshold_value == $CiscoValue) { $num_thresholds_ok++; }
