@@ -43,7 +43,7 @@ foreach ($this->DS as $KEY=>$VAL) {
 	$lower    = "";
 	$upper    = "";
 	
-	if ($VAL['UNIT'] == "C" && preg_match("/^en-US,/", $_SERVER['HTTP_ACCEPT_LANGUAGE'] )) {
+	if ($VAL['UNIT'] == "C" && preg_match("/^en-US/", $_SERVER['HTTP_ACCEPT_LANGUAGE'] )) {
 		if ($VAL['WARN'] != "" && is_numeric($VAL['WARN']) ){
 			$warning = round ($VAL['WARN'] * 9 / 5 + 32);
 		}
