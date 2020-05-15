@@ -74,7 +74,7 @@ foreach ($this->DS as $KEY=>$VAL) {
 		$lower = " --lower=0 ";
 	}
 	elseif ($VAL['UNIT'] == "C") {
-		if (preg_match("/^en-US,/", $_SERVER['HTTP_ACCEPT_LANGUAGE'] )) {
+		if (preg_match("/^en-US/", $_SERVER['HTTP_ACCEPT_LANGUAGE'] )) {
 			$vlabel = "°F";
 		} else {
 			$vlabel = "°C";
