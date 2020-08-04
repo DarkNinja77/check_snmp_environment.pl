@@ -1,6 +1,6 @@
 # check_snmp_environment.pl
 
-2020-05-11: Fixed warning and critical return codes when thresholds are crossed.
+2020-05-11: Fixed warning and critical return codes when thresholds are hit.
 
 2020-04-29: Added performance output in "cisco" mode.
 
