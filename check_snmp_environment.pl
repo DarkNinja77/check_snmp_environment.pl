@@ -22,7 +22,7 @@
 # of the use of SNMP Bulk option which is more efficient. SNMPv3 also 
 # uses SNMP Bulk.
 #
-# This scrip supports IPv6. You can use the "-6" switch for this.
+# This script supports IPv6. You can use the "-6" switch for this.
 #
 # ============================================================================
 # ============================== SUPPORTED CHECKS ============================
