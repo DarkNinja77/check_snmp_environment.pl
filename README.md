@@ -15,7 +15,7 @@
 
 
 ## How to use
-### Nagios command definitions
+### Nagios command definition examples
 ```
 define command {
         command_name    check_environment_cisco_isr4k
