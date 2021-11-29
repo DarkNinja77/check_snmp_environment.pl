@@ -1,4 +1,4 @@
-# check_snmp_environment.pl
+## Changelog
 
 2021-11-29: Fixed typos.
 
