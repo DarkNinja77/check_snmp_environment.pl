@@ -16,6 +16,7 @@
 
 ## How to use
 ### Nagios command definitions
+```
 define command {
         command_name    check_environment_cisco_isr4k
         command_line    $USER1$/check_snmp_environment.pl -2 -t 10 -H $HOSTADDRESS$ -C $USER2$ -T ciscoNEW -f -R '^Temp: Inlet( 1)* R0/0$'
@@ -32,3 +33,4 @@ define command {
         command_name    check_environment_cisco_switch
         command_line    $USER1$/check_snmp_environment.pl -2 -t 10 -H $HOSTADDRESS$ -C $USER2$ -T cisco -f -R "Inlet Temp Sensor|Sensor#1|Temp [Ss]ensor 0|^Air [Ii]nlet$|Temp: *[Ii]nlet$"
 }
+```
