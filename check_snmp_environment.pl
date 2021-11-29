@@ -3,7 +3,7 @@
 # ============================== INFO ========================================
 # ============================================================================
 # Version	: 0.8
-# Date		: April 22 2020
+# Date		: November 29 2021
 # Author	: Michiel Timmers (michiel.timmers AT gmx.net)
 # Based on	: "check_snmp_env" plugin (version 1.3) from Patrick Proy
 # Licence 	: GPL - summary below
