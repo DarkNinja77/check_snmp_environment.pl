@@ -993,7 +993,7 @@ $session->close;
 verb ("status : $global_status");
 
 if ( ($fan_exist+$ps_exist+$temp_exist) == 0) {
-  print "No environemental informations found : UNKNOWN\n";
+  print "UNKNOWN: No environmental data found.\n";
   exit $ERRORS{"UNKNOWN"};
 }
 
@@ -1313,7 +1313,7 @@ $session->close;
 verb ("status : $global_status");
 
 if ( ($fan_exist+$ps_exist+$temp_exist) == 0) {
-  print "No environemental informations found : UNKNOWN\n";
+  print "UNKNOWN: No environmental data found.\n";
   exit $ERRORS{"UNKNOWN"};
 }
 
@@ -2256,16 +2256,18 @@ if ($o_check_type eq "ciscoNEW") {
 	&check_snmp_result($resultat_physicaldescr,$session->error);
 	my $resultat_type 		= $session->get_table(Baseoid => $cisco_ios_xe_type);
 	&check_snmp_result($resultat_type,$session->error);
-	my $resultat_value 		= $session->get_table(Baseoid => $cisco_ios_xe_value);
-	&check_snmp_result($resultat_value,$session->error);
+	my $resultat_scale 		= $session->get_table(Baseoid => $cisco_ios_xe_scale);
+	&check_snmp_result($resultat_scale,$session->error);
 	my $resultat_precision 		= $session->get_table(Baseoid => $cisco_ios_xe_precision);
 	&check_snmp_result($resultat_precision,$session->error);
-	my $resultat_threshold_value 	= $session->get_table(Baseoid => $cisco_ios_xe_threshold_value);
-	&check_snmp_result($resultat_threshold_value,$session->error);
+	my $resultat_value 		= $session->get_table(Baseoid => $cisco_ios_xe_value);
+	&check_snmp_result($resultat_value,$session->error);
 	my $resultat_threshold_severity	= $session->get_table(Baseoid => $cisco_ios_xe_threshold_severity);
 	&check_snmp_result($resultat_threshold_severity,$session->error);
 	my $resultat_threshold_relation	= $session->get_table(Baseoid => $cisco_ios_xe_threshold_relation);
 	&check_snmp_result($resultat_threshold_relation,$session->error);
+	my $resultat_threshold_value 	= $session->get_table(Baseoid => $cisco_ios_xe_threshold_value);
+	&check_snmp_result($resultat_threshold_value,$session->error);
 
 	if (defined($resultat_status)) {	
 		foreach my $key ( keys %$resultat_status) {
@@ -2293,7 +2295,6 @@ if ($o_check_type eq "ciscoNEW") {
 
 					# Get sensor PRECISION
 					my $CiscoPrecision = $$resultat_precision{$cisco_ios_xe_precision.".".$index};	
-
 
 					if ($CiscoPrecision == 0){
 						# Get sensor THRESHOLDS
@@ -2366,8 +2367,6 @@ if ($o_check_type eq "ciscoNEW") {
 
 					# Fill performance output string
 					if (defined($o_perf)) {
-						my $resultat_scale 		= $session->get_table(Baseoid => $cisco_ios_xe_scale);
-						&check_snmp_result($resultat_scale,$session->error);
 						my $CiscoScale = $$resultat_scale{$cisco_ios_xe_scale.".".$index};
 
 						if ( defined($o_regex) && $CiscoDescription =~ /$o_regex/  ||  ! defined($o_regex) ) {
