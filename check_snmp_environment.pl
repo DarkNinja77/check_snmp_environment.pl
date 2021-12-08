@@ -2,8 +2,8 @@
 # ============================================================================
 # ============================== INFO ========================================
 # ============================================================================
-# Version	: 0.8
-# Date		: November 29 2021
+# Version	: 0.9
+# Date		: December 8 2022
 # Author	: Michiel Timmers (michiel.timmers AT gmx.net)
 # Based on	: "check_snmp_env" plugin (version 1.3) from Patrick Proy
 # Licence 	: GPL - summary below
@@ -36,6 +36,7 @@
 # ciscoSW ________: Cisco Systems : Card and module status check
 # ciscoNEW _______: Cisco Systems : Sensor check for devices that have 
 #		    the CISCO-ENTITY-SENSOR-MIB
+# ciscoWLC _______: Cisco Systems : Temperature
 # nokia __________: Nokia IP : Fan, power-supply
 # bc _____________: Blue Coat Systems : Fan, power-supply, voltage, disk
 # iron ___________: IronPort : Fan, power-supply, temperature
@@ -91,6 +92,7 @@
 #		- general: Lots of small fixes
 # version 0.8 : - fixed runtime errors
 #		- ciscoNEW: added threshold relations
+# version 0.9 : - ciscoWLC: added 
 #
 # ============================================================================
 # ============================== LICENCE =====================================
@@ -242,7 +244,7 @@ my $linux_misc				= "1.3.6.1.4.1.2021.13.16.5.1"; 	# misc table
 my $linux_misc_descr			= "1.3.6.1.4.1.2021.13.16.5.1.2"; 	# misc entry description
 my $linux_misc_value			= "1.3.6.1.4.1.2021.13.16.5.1.3"; 	# misc entry value
 
-# Cisco switches (catalys & IOS)
+# Cisco switches (catalyst & IOS)
 my $cisco_chassis_card_descr		= "1.3.6.1.4.1.9.3.6.11.1.3"; 		# Chassis card description
 my $cisco_chassis_card_slot		= "1.3.6.1.4.1.9.3.6.11.1.7"; 		# Chassis card slot number
 my $cisco_chassis_card_state		= "1.3.6.1.4.1.9.3.6.11.1.9"; 		# operating status of card - 1 : Not specified, 2 : Up, 3: Down, 4 : standby
@@ -259,6 +261,11 @@ my @cisco_module_status_text 		=("Unknown", "unknown", "OK", "Disabled", "OkButD
 					"PoweredUp", "PowerDenied", "PowerCycled", "OkButPowerOverWarning", 
 					"OkButPowerOverCritical", "SyncInProgress");
 my @cisco_module_status 		= (3,3,0,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2);
+
+# Cisco WLC (Wireless LAN Controller)
+my $cisco_wlc_temp_internal_now		= "1.3.6.1.4.1.14179.2.3.1.13.0";	# Internal Temperature now
+my $cisco_wlc_temp_internal_low		= "1.3.6.1.4.1.14179.2.3.1.14.0";	# Internal Temperature low alarm
+my $cisco_wlc_temp_internal_high	= "1.3.6.1.4.1.14179.2.3.1.15.0";	# Internal Temperature high alarm
 
 # Juniper routers (JUNOS)
 my $juniper_operating_descr		= "1.3.6.1.4.1.2636.3.1.13.1.5"; 	# Component description
@@ -366,7 +373,7 @@ my $o_version1		= undef;	# Use SNMPv1
 my $o_version2		= undef;	# Use SNMPv2c
 my $o_domain		= undef;	# Use IPv6
 my $o_check_type	= "cisco";	# Default check is "cisco"
-my @valid_types		= ("cisco","nokia","bc","iron","foundry","linux","ciscoSW","extremeSW","juniper","procurve","netscreen","ciscoNEW","citrix","transmode");	
+my @valid_types		= ("cisco","nokia","bc","iron","foundry","linux","ciscoSW","extremeSW","juniper","procurve","netscreen","ciscoNEW","citrix","transmode","ciscoWLC");	
 my $o_temp		= undef;	# Max temp
 my $o_fan		= undef;	# Min fan speed
 my $o_login		= undef;	# Login for SNMPv3
@@ -388,7 +395,7 @@ sub p_version {
 
 # Subroutine: Print Usage
 sub print_usage {
-    print "Usage: $0 [-v] -H <host> [-6] -C <snmp_community> [-2] | (-l login -x passwd [-X pass -L <authp>,<privp>])  [-p <port>] -T (cisco|ciscoSW|ciscoNEW|nokia|bc|iron|foundry|linux|extremeSW|juniper|procurve|netscreen|citrix|transmode) [-F <rpm>] [-c <celcius>] [-f] [-t <timeout>] [-V]\n";
+    print "Usage: $0 [-v] -H <host> [-6] -C <snmp_community> [-2] | (-l login -x passwd [-X pass -L <authp>,<privp>])  [-p <port>] -T (cisco|ciscoSW|ciscoNEW|ciscoWLC|nokia|bc|iron|foundry|linux|extremeSW|juniper|procurve|netscreen|citrix|transmode) [-F <rpm>] [-c <celcius>] [-f] [-t <timeout>] [-V]\n";
 }
 
 # Subroutine: Check number
@@ -452,11 +459,12 @@ Options:
    <privproto> : Priv protocole (des|aes : default aes) 
 -P, --port=PORT
    SNMP port (Default 161)
--T, --type=cisco|ciscoSW|ciscoNEW|nokia|bc|iron|foundry|linux|extremeSW|juniper|procurve|netscreen|citrix|transmode
+-T, --type=cisco|ciscoSW|ciscoNEW|ciscoWLC|nokia|bc|iron|foundry|linux|extremeSW|juniper|procurve|netscreen|citrix|transmode
    Environmental check : 
 	cisco __________: Cisco Systems : Fan, power-supply, voltage, temperature
 	ciscoSW ________: Cisco Systems : Card and module status check
 	ciscoNEW _______: Cisco Systems : Sensor check for devices that have the CISCO-ENTITY-SENSOR-MIB
+	ciscoWLC _______: Cisco Systems : Wireless LAN Controller temperature check
 	nokia __________: Nokia IP : Fan, power-supply
 	bc _____________: Blue Coat Systems : Fan, power-supply, voltage, disk
 	iron ___________: IronPort : Fan, power-supply, temperature
@@ -1478,6 +1486,84 @@ if ($o_check_type eq "linux") {
 
 	print "Not implemented yet : UNKNOWN\n";
 	exit $ERRORS{"UNKNOWN"};
+}
+
+
+# ============================================================================
+# ================================= CISCO WLC ================================
+# ============================================================================
+
+if ($o_check_type eq "ciscoWLC") {
+
+  verb("Checking ciscoWLC env");
+
+  my $output = "UNKNOWN"; my $output_perf = "";
+  my $exit_status = 3;
+  my @oids = ( $cisco_wlc_temp_internal_now,
+               $cisco_wlc_temp_internal_low,
+               $cisco_wlc_temp_internal_high  );
+  my $temp_now;
+  my $temp_low_warning; my $temp_low_critical;
+  my $temp_high_warning; my $temp_high_critical;
+
+  # Get SNMP values and check the result
+  my $result = $session->get_request( @oids );
+  &check_snmp_result($result,$session->error);
+
+  if (defined($result)) {	
+    foreach my $key ( keys %$result ) {
+      if ($key =~ /$cisco_wlc_temp_internal_now/) {
+        $temp_now = $$result{$key};
+      } elsif ($key =~ /$cisco_wlc_temp_internal_low/) {
+        $temp_low_critical = $$result{$key};
+      } elsif ($key =~ /$cisco_wlc_temp_internal_high/) {
+        $temp_high_critical = $$result{$key};
+      }
+    }
+  }
+  $session->close;
+
+  if ($temp_now =~ /^-?\d+$/) {
+    $output = "OK - Temperature good: $temp_now°C";
+    $output_perf = "'Internal Temperature'=".$temp_now."C";
+    $exit_status = 0;
+
+    if ($temp_low_critical =~ /^-?\d+$/) {
+      # set low warning threshold 4 degrees celcius higher than crititcal threshold
+      $temp_low_warning = $temp_low_critical + 4 ;
+    }
+    if ($temp_high_critical =~ /^-?\d+$/) {
+      # set high warning threshold 4 degrees celcius lower than crititcal threshold
+      $temp_high_warning = $temp_high_critical - 4 ;
+      # add high thresholds to performance output
+      $output_perf .= ";".$temp_high_warning.";".$temp_high_critical;
+    }
+
+    # Order of if statements is relevant: least to most important
+    if ($temp_low_warning =~ /^-?\d+$/ && $temp_now <= $temp_low_warning) {
+      $output = "WARNING - Temperature too low: $temp_now°C";
+      $exit_status = 1;
+    }
+    if ($temp_high_warning =~ /^-?\d+$/ && $temp_now >= $temp_high_warning) {
+      $output = "WARNING - Temperature too high: $temp_now°C";
+      $exit_status = 1;
+    }
+    if ($temp_low_critical =~ /^-?\d+$/ && $temp_now <= $temp_low_critical) {
+      $output = "CRITICAL - Temperature too low: $temp_now°C";
+      $exit_status = 2;
+    }
+    if ($temp_high_critical =~ /^-?\d+$/ && $temp_now >= $temp_high_critical) {
+      $output = "CRITICAL - Temperature too high: $temp_now°C";
+      $exit_status = 2;
+    }
+  }
+
+  if (defined($o_perf)) {
+    print $output." | ".$output_perf."\n";
+  } else {
+    print $output."\n";
+  }
+  exit $exit_status;
 }
 
 
